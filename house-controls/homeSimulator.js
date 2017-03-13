@@ -4,10 +4,7 @@
 * If viewing the file using the file:// protocol then
 * The JSON data is stored in localStorage and updates are stored there.
 * Persisting to server is not currently possible.
-*/
-
-/**
-* Represents storage
+*
 * @param {string} name - property containing values for localStorage
 */
 function Store(name) {
@@ -17,7 +14,7 @@ function Store(name) {
 
 /**
 * Save updated values to localStorage
-* @param {Object} updateData 
+* @param {Object} - updateData 
 * { 
 *   ctrltype: control type (toggle||slider||multi), 
 *   id: room identifier,
@@ -60,10 +57,12 @@ Store.prototype.remove = function(id) {
 }
 
 /**
-* get room data via XHR, static file - 'rooms.json', 
-* copy stringified data to localStorage for updating
+* Get room data via XHR, static file - 'rooms.json', 
+* Copy stringified data to localStorage for updating
 * 
-* @callback callback
+* I've also included a fallback to use an included javascript file
+* in case this is viewed via file:// for instance.
+* @callback {function} callback to be run after data is retrieved
 */
 Store.prototype.retrieveAll = function(callback) {
   callback = callback || function() {}
@@ -83,7 +82,7 @@ Store.prototype.retrieveAll = function(callback) {
 
 /**
 * Model - contains methods for reading, updating control settings
-* @param {Object} - storage for model, 
+* @param {Object} - storage for model
 */
 function Model(storage) {
   this.storage = storage;
@@ -113,13 +112,14 @@ Model.prototype.remove = function(id) {
 * $roomlist is the DOM element we are working with
 * bind() register event handlers
 * render( display data in template)
+* @param {object} template - HTML layout template used by the view
 */
 function View(template) {
   this.template = template;
   this.$roomlist = $('#roomlist');
 }
 
-/*
+/**
 * Pick a view to render
 * TODO: add filters for viewing rooms or control types
 * @param {string} cmd - view to render
@@ -138,6 +138,19 @@ View.prototype.render = function(cmd, args) {
   viewCommands[cmd]();
 }
 
+/**
+* Refresh control settings after user update 
+*
+* @oarams {Object} updateData 
+* { 
+*   ctrltype: control type (toggle||slider||multi), 
+*   id: room identifier,
+*   value: value to be saved for control
+* }
+* 
+* Function can be supplied as callback to be run after saving settings to store
+*/
+
 View.prototype.updateDisplayValues = function(updateData) {
   var updatedElemSelector 
   = '[data-ctrltype='  + updateData.ctrltype + ']' 
@@ -150,7 +163,15 @@ View.prototype.updateDisplayValues = function(updateData) {
   $(updatedElemSelector).val(updateData.value);
 }
 
-
+/**
+* Bind input elements to UI events with provided event handler
+* Controller calls this providing a name for the event, handler function
+* Elements are selected by control type.
+* Uses delegated targets.
+* 
+* @param {string} event named by controller
+* @param {function} handler function to be run by
+*/
 View.prototype.bind = function(event, handler) {
   var self = this;
   if (event === 'toggleClick' ) {
@@ -168,12 +189,13 @@ View.prototype.bind = function(event, handler) {
 */
 
 function Controller(model, view) {
-  console.log('controller', model, view);
-  var self = this;
-  self.model = model;
-  self.view = view;
+  this.model = model;
+  this.view = view;
 }
 
+/**
+* Show all controls, set bindings. This is run on page load.
+*/
 Controller.prototype.showAll = function() {
   var self = this;
   self.model.read(function(data) {
@@ -193,11 +215,18 @@ Controller.prototype.showAll = function() {
 
 /*
 * Choose view- (currently a view of a panel for all controls in all rooms)
+* But this is where i'd like to add views filtered by room or control type
 */
 Controller.prototype.setView = function() {
   this.showAll();
 }
 
+/**
+* Save an updated control value
+*
+* @param {object} ctrlData {id: room id, ctrltype: type of control}
+* @value {string} value
+*/
 Controller.prototype.saveControlSetting = function(ctrlData, value) {
   var updateData = {
     id: ctrlData.roomid,
@@ -215,7 +244,7 @@ Controller.prototype.saveControlSetting = function(ctrlData, value) {
 /*
 * HTML Templates
 * Basic. Using String.replace(). This is a toy app after all.
-* formatting this way helps legibility
+* formatting this way helps legibility (for me anyway).
 */
 
 function Template() {
@@ -233,7 +262,6 @@ function Template() {
   + ' </form>'
   + '</li>';
 
-  // $('#toggleBedroom input').is(':checked') returns true || false
   this.controlTemplate.toggle
   = '<li data-ctrltype="toggle" data-roomId={{roomId}}>'
   + ' <label class="control-label">{{label}}</label>'
@@ -245,7 +273,6 @@ function Template() {
 
   this.controlTemplate.multi
   = '<li class="multi" data-ctrltype="multi" data-roomId={{roomId}} >'
-  + ' <script>var formEnumValues={{enumValues}}</script>'
   + ' <label class="control-label">{{label}}</label>'
   + ' <form>'
   + '   <br><output name="multioutput">{{defaultValue}}</output><br>'
@@ -255,6 +282,7 @@ function Template() {
 }
 
 /**
+* Returns a template populated with values from data.
 * @param {object} data - room and controls data to be displayed in template
 */
 Template.prototype.show = function(data) {
@@ -277,9 +305,6 @@ Template.prototype.show = function(data) {
         template = template.replace('{{min}}', ctrl.rangeValues.min);
         template = template.replace('{{max}}', ctrl.rangeValues.max);
       }
-      if (ctrl.type === 'multi') {
-        template = template.replace('{{enumValues}}', ctrl.enumValues);
-      }
       controlpanelLayout = controlpanelLayout + template;
     }
     view = view.replace('{{controlPanel}}', controlpanelLayout);
@@ -289,6 +314,7 @@ Template.prototype.show = function(data) {
 
 /**
 * Control panel application
+* Let's put the objects above together.
 */
 
 function ControlPanel(name) {
@@ -302,7 +328,7 @@ function ControlPanel(name) {
 // new control panel
 var cp = new ControlPanel('home');
 
-// Call
+// Set an initial view
 function loadControlPanel() {
   cp.controller.setView();
 }
